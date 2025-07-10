@@ -85,9 +85,9 @@
 		</dependency>
 
 		<dependency>
-            <groupId>com.recupera.item.back</groupId>
-            <artifactId>common</artifactId>
-            <version>0.0.1-SNAPSHOT</version>
+            <groupId>com.commodto.common</groupId>
+			<artifactId>common</artifactId>
+			<version>0.0.1-SNAPSHOT</version>
         </dependency>
 		<dependency>
 			<groupId>org.projectlombok</groupId>

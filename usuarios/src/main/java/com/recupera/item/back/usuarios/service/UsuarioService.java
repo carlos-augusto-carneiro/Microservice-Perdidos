@@ -15,22 +15,23 @@ import com.recupera.item.back.usuarios.model.usuario.Usuario;
 import com.recupera.item.back.usuarios.producer.UsuarioProducer;
 import com.recupera.item.back.usuarios.producer.UsuarioLogadoProducer;
 import com.recupera.item.back.usuarios.repository.IUsuarioRepository;
-
+import com.commodto.common.dto.UsuarioLogadoDto;
 @Service
 public class UsuarioService {
 
-    @Autowired
     private IUsuarioRepository usuarioRepository;
 
-    @Autowired  
     private BCryptPasswordEncoder passwordEncoder;
 
-    @Autowired
     private UsuarioProducer kafkaProducerService;
 
-    @Autowired
     private UsuarioLogadoProducer kafkaProducerLogadoService;
 
+    public UsuarioService(IUsuarioRepository usuarioRepository, BCryptPasswordEncoder passwordEncoder, UsuarioProducer usuarioProducer) {
+        this.usuarioRepository = usuarioRepository;
+        this.passwordEncoder = passwordEncoder;
+        this.kafkaProducerService = usuarioProducer;
+    }
 
     public Usuario createUsuario(DTOCreatedUsuario usuario) {
         if (usuario == null) {
@@ -103,7 +104,7 @@ public class UsuarioService {
     }
 
     public void publicarLogin(Long usuarioId, String nome, String perfil) {
-        kafkaProducerLogadoService.publicarLogin(new com.commodto.common.dto.UsuarioLogadoDto(usuarioId, nome, perfil));
+        kafkaProducerLogadoService.publicarLogin(new UsuarioLogadoDto(usuarioId, perfil));
     }
 
     public List<Usuario> listarUsuarios() {

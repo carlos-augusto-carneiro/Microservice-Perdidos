@@ -9,6 +9,8 @@ import org.springframework.stereotype.Service;
 import com.recupera.item.back.itens.item.model.Item;
 import com.recupera.item.back.itens.item.repository.ItemRepository;
 import com.commodto.common.dto.UsuarioLogadoDto;
+import org.springframework.cache.annotation.Cacheable;
+
 
 import com.recupera.item.back.itens.item.dto.CriarItemDto;
 
@@ -46,4 +48,10 @@ public class ItemService {
         return itemRepository.save(novoItem);
     }
 
+    @Cacheable(value = "usuariosLogados", key = "#usuarioLogadoDto.usuarioId()")
+    public void processarUsuarioLogado(UsuarioLogadoDto usuarioLogadoDto) {
+        if (usuarioLogadoDto == null || usuarioLogadoDto.usuarioId() <= 0) {
+            throw new IllegalArgumentException("Dados do usuário logado inválidos");
+        }
+    }
 }
