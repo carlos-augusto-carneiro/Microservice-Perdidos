@@ -1,5 +1,12 @@
 # Projeto Recupera (Microserviços)
-
+![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.0%2B-6DB33F?logo=spring&logoColor=white)
+![Spring Cloud Gateway](https://img.shields.io/badge/Spring%20Cloud%20Gateway-3.0%2B-6DB33F?logo=spring&logoColor=white)
+![Eureka Server](https://img.shields.io/badge/Eureka%20Server-3.0%2B-6DB33F?logo=spring&logoColor=white)
+![Apache Kafka](https://img.shields.io/badge/Apache%20Kafka-3.0%2B-231F20?logo=apache-kafka&logoColor=white)
+![Maven](https://img.shields.io/badge/Maven-3.8%2B-C71A36?logo=apache-maven&logoColor=white)
+![Git](https://img.shields.io/badge/Git-2.30%2B-F05032?logo=git&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14%2B-316192?logo=postgresql&logoColor=white)
+![Docker Compose](https://img.shields.io/badge/Docker%20Compose-2.0%2B-blue?logo=docker&logoColor=white)
 ## Requisitos
 
 - Java 17 ou superior
