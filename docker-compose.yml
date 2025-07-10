@@ -1,0 +1,201 @@
+version: '3.9'
+services:
+  postgres:
+    image: postgres:latest
+    container_name: recupera-postgres
+    restart: unless-stopped # Adicionado: Garante que o serviço reinicie a menos que seja parado explicitamente
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - recupera-network
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0 # Imagem oficial da Confluent para Zookeeper
+    container_name: zookeeper
+    restart: unless-stopped
+    ports:
+      - "2181:2181" # Porta padrão do Zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - recupera-network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0 # Imagem oficial da Confluent para Kafka
+    container_name: kafka
+    restart: unless-stopped
+    ports:
+      - "9092:9092" # Porta padrão do Kafka para comunicação externa
+      - "29092:29092" # Porta adicional para comunicação interna
+    depends_on:
+      - zookeeper # Kafka depende do Zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181 # Nome do serviço Zookeeper no Docker Compose
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9092
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: true
+      KAFKA_DELETE_TOPIC_ENABLE: true
+    networks:
+      - recupera-network
+
+  eureka-server:
+    build:
+      context: .
+      dockerfile: dockerfile
+      target: eureka-server
+    container_name: recupera-eureka-server
+    restart: unless-stopped
+    ports:
+      - "8761:8761" # Porta padrão do Eureka Server
+    environment:
+      SERVER_PORT: 8761
+      EUREKA_CLIENT_REGISTER_WITH_EUREKA: false
+      EUREKA_CLIENT_FETCH_REGISTRY: false
+      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://eureka-server:8761/eureka/
+      EUREKA_INSTANCE_HOSTNAME: eureka-server
+      SPRING_APPLICATION_NAME: eureka-server
+    networks:
+      - recupera-network
+
+  # API Gateway - deve aguardar os outros serviços
+  api-gateway:
+    build:
+      context: .
+      dockerfile: dockerfile
+      target: gateway
+    container_name: recupera-api-gateway
+    restart: unless-stopped
+    ports:
+      - "8080:8080" # Porta principal do gateway
+    depends_on:
+      - eureka-server
+      - usuarios-services
+      - email-services
+    environment:
+      SERVER_PORT: 8080
+      # Configuração do Swagger/OpenAPI
+      SPRINGDOC_SWAGGER_UI_PATH: /swagger-ui.html
+      SPRINGDOC_API_DOCS_PATH: /v3/api-docs
+      # Configuração para conectar aos serviços via Eureka
+      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://eureka-server:8761/eureka/
+      EUREKA_INSTANCE_PREFER_IP_ADDRESS: true
+      EUREKA_INSTANCE_HOSTNAME: api-gateway
+      SPRING_APPLICATION_NAME: api-gateway
+      # Configuração do Spring Cloud Gateway
+      SPRING_CLOUD_GATEWAY_DISCOVERY_LOCATOR_ENABLED: true
+      SPRING_CLOUD_GATEWAY_DISCOVERY_LOCATOR_LOWER_CASE_SERVICE_ID: true
+    networks:
+      - recupera-network
+
+  usuarios-services:
+    build:
+      context: .
+      dockerfile: dockerfile
+      target: usuarios
+    container_name: recupera-usuarios-services
+    depends_on:
+      - eureka-server
+      - postgres
+      - kafka # Agora o serviço de usuários pode depender do Kafka se ele for um produtor/consumidor
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB} # Usando a variável de ambiente para o DB Name
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      SERVER_PORT: 8081 # Mudança: Porta 8081 para usuários
+      SPRINGDOC_SWAGGER_UI_PATH: /swagger-ui.html
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092 # Adicionado: Configuração para Kafka no serviço de usuários
+      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://eureka-server:8761/eureka/
+      EUREKA_INSTANCE_PREFER_IP_ADDRESS: true
+      EUREKA_INSTANCE_HOSTNAME: usuarios-services
+      SPRING_APPLICATION_NAME: usuarios-services
+    ports:
+      - "8081:8081" # Mudança: Porta 8081 para usuários
+    networks:
+      - recupera-network
+
+  email-services:
+    build:
+      context: .
+      dockerfile: dockerfile
+      target: email
+    container_name: recupera-email-services
+    depends_on:
+      - eureka-server
+      - postgres # Adicionado: O serviço de email precisa de acesso ao DB para tokens de confirmação
+      - kafka # Adicionado: O serviço de email provavelmente consumirá mensagens do Kafka
+    environment:
+      # Configurações de banco de dados
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      SERVER_PORT: 8082 # Mudança: Porta 8082 para email
+      SPRINGDOC_SWAGGER_UI_PATH: /swagger-ui.html
+      # Configurações de e-mail (Exemplo, você deve colocar isso no seu .env do serviço de e-mail)
+      SPRING_MAIL_HOST: ${SPRING_MAIL_HOST}
+      SPRING_MAIL_PORT: ${SPRING_MAIL_PORT}
+      SPRING_MAIL_USERNAME: ${SPRING_MAIL_USERNAME}
+      SPRING_MAIL_PASSWORD: ${SPRING_MAIL_PASSWORD}
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH}
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE}
+      SPRING_MAIL_PROPERTIES_MAIL_DEBUG: ${SPRING_MAIL_PROPERTIES_MAIL_DEBUG}
+      # Configurações de Kafka para o serviço de e-mail (se for um consumidor)
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092 # Nome do serviço Kafka no Docker Compose
+      SPRING_KAFKA_CONSUMER_GROUP_ID: email_group
+      # Configurações do Eureka Client
+      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://eureka-server:8761/eureka/
+      EUREKA_INSTANCE_PREFER_IP_ADDRESS: true
+      EUREKA_INSTANCE_HOSTNAME: email-services
+      SPRING_APPLICATION_NAME: email-services
+    ports:
+      - "8082:8082" # Mudança: Porta 8082 para email
+    networks:
+      - recupera-network
+  
+  item-services:
+    build:
+      context: .
+      dockerfile: dockerfile
+      target: item
+    container_name: recupera-item-services
+    depends_on:
+      - eureka-server
+      - postgres # Adicionado: O serviço de item precisa de acesso ao DB para persistência
+      - kafka # Adicionado: O serviço de item provavelmente consumirá mensagens do Kafka
+    environment:
+      # Configurações de banco de dados
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      SERVER_PORT: 8083 # Mudança: Porta 8083 para item
+      SPRINGDOC_SWAGGER_UI_PATH: /swagger-ui.html
+      # Configurações de Kafka para o serviço de item (se for um consumidor)
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092 # Nome do serviço Kafka no Docker Compose
+      SPRING_KAFKA_CONSUMER_GROUP_ID: item_group
+      # Configurações do Eureka Client
+      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://eureka-server:8761/eureka/
+      EUREKA_INSTANCE_PREFER_IP_ADDRESS: true
+      EUREKA_INSTANCE_HOSTNAME: item-services
+      SPRING_APPLICATION_NAME: item-services
+    ports:
+      - "8083:8083" # Mudança: Porta 8083 para item
+    networks:
+      - recupera-network
+      
+
+volumes:
+  postgres_data: # Volume para persistir os dados do PostgreSQL
+
+networks:
+  recupera-network:
+    driver: bridge # Define uma rede bridge para todos os seus serviços se comunicarem

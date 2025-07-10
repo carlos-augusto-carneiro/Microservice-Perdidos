@@ -1,0 +1,37 @@
+# Ignorar arquivos desnecessários para o build Docker
+**/target/
+**/node_modules/
+**/.git/
+**/.gitignore
+**/.vscode/
+**/.idea/
+**/*.md
+**/.mvn/
+**/mvnw
+**/mvnw.cmd
+
+# Arquivos de configuração locais
+**/.env
+**/.env.local
+**/.env.*.local
+
+# Logs
+**/logs/
+**/*.log
+
+# Cache
+**/.cache/
+**/tmp/
+**/temp/
+
+# Arquivos de sistema
+**/.DS_Store
+**/Thumbs.db
+
+# Manter apenas os arquivos necessários
+!pom.xml
+!*/pom.xml
+!src/
+!*/src/
+!wait-for-it.sh
+!*/wait-for-it.sh
