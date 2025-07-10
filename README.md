@@ -6,7 +6,10 @@
 - Docker Desktop
 - Maven
 - Git
-
+## O que falta
+- Terminar o serviço item
+- Terminar os testes unitários
+  
 ## Configuração do Ambiente
 
 1. Clone o repositório:
